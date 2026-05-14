@@ -59,7 +59,16 @@ function activateAssociativeDomains(xcodeProject) {
 
   for (config in configurations) {
     buildSettings = configurations[config].buildSettings;
-    buildSettings['CODE_SIGN_ENTITLEMENTS'] = '"' + entitlementsFilePath + '"';
+
+    // skip ShareExtension target configs - they have their own entitlements file
+    // and the main app's entitlements path is wrong for them. without this guard
+    // the share extension fails to sign because the main app's entitlements list
+    // Apple Pay / Push / Associated Domains - capabilities the share extension's
+    // provisioning profile correctly doesnt have.
+    var aIsShareExt = buildSettings['PRODUCT_NAME'] && (''+buildSettings['PRODUCT_NAME']).indexOf('ShareExt') >= 0;
+    if (!aIsShareExt) {
+      buildSettings['CODE_SIGN_ENTITLEMENTS'] = '"' + entitlementsFilePath + '"';
+    }
 
     // if deployment target is less then the required one - increase it
     if (buildSettings['IPHONEOS_DEPLOYMENT_TARGET']) {
