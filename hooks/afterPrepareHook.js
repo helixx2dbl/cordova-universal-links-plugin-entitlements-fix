@@ -75,12 +75,46 @@ function activateUniversalLinksInAndroid(cordovaContext, pluginPreferences) {
  * @param {Object} pluginPreferences - plugin preferences from the config.xml file. Basically, content from <universal-links> tag.
  */
 function activateUniversalLinksInIos(cordovaContext, pluginPreferences) {
-  // modify xcode project preferences
-  iosProjectPreferences.enableAssociativeDomainsCapability(cordovaContext);
+  // cordova-ios 7+ names the project folder and .xcodeproj "App" no matter what the app is
+  // called, and ships its own Entitlements-Debug/Release.plist which the target already signs
+  // with.  This plugin predates that: it writes <AppName>/Resources/<AppName>.entitlements and
+  // repoints CODE_SIGN_ENTITLEMENTS at it - a folder that does not exist in the new layout, so
+  // the build fails with "Build input file cannot be found", and any entitlement another plugin
+  // contributed (Pushwoosh's aps-environment, say) is dropped from signing along the way.
+  //
+  // On that layout, leave entitlements alone.  Declare the associated domains in config.xml
+  // instead, which cordova merges into its own plists:
+  //
+  //   <config-file parent="com.apple.developer.associated-domains"
+  //                target="*/Entitlements-Release.plist">
+  //     <array><string>applinks:your.host.com</string></array>
+  //   </config-file>
+  //
+  // The AASA helper file below is just a file written for you to upload, so it still runs.
+  if (usesModernIosLayout(cordovaContext)) {
+    console.log('cordova-ios 7+ detected: skipping entitlements generation. Declare associated ' +
+                'domains via <config-file target="*/Entitlements-*.plist"> in config.xml.');
+  } else {
+    // modify xcode project preferences
+    iosProjectPreferences.enableAssociativeDomainsCapability(cordovaContext);
 
-  // generate entitlements file
-  iosProjectEntitlements.generateAssociatedDomainsEntitlements(cordovaContext, pluginPreferences);
+    // generate entitlements file
+    iosProjectEntitlements.generateAssociatedDomainsEntitlements(cordovaContext, pluginPreferences);
+  }
 
   // generate apple-site-association-file
   iosAppSiteAssociationFile.generate(cordovaContext, pluginPreferences);
+}
+
+/**
+ * Is this the cordova-ios 7+ project layout, where the folder is always called "App"?
+ *
+ * @param {Object} cordovaContext - cordova context object
+ * @return {Boolean} true if the fixed-name layout is in use
+ */
+function usesModernIosLayout(cordovaContext) {
+  var path = require('path');
+  var fs = require('fs');
+
+  return fs.existsSync(path.join(cordovaContext.opts.projectRoot, 'platforms', 'ios', 'App.xcodeproj'));
 }

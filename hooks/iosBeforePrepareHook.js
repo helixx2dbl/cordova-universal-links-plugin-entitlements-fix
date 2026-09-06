@@ -30,11 +30,18 @@ function run(ctx) {
     return;
   }
 
-  console.log('Project name has changed. Renaming .entitlements file.');
-
-  // if it does - rename it
+  // Nothing to rename if the old file was never created.  On cordova-ios 7+ the project folder
+  // and .xcodeproj are ALWAYS called "App" regardless of the app name, so getOldProjectName()
+  // returns "App" on a project that was never renamed - this hook then reports a rename that did
+  // not happen and throws ENOENT on a file that has never existed.
   var oldEntitlementsFilePath = path.join(iosProjectFilePath, oldProjectName, 'Resources', oldProjectName + '.entitlements');
   var newEntitlementsFilePath = path.join(iosProjectFilePath, oldProjectName, 'Resources', newProjectName + '.entitlements');
+
+  if (!fs.existsSync(oldEntitlementsFilePath)) {
+    return;
+  }
+
+  console.log('Project name has changed. Renaming .entitlements file.');
 
   try {
     fs.renameSync(oldEntitlementsFilePath, newEntitlementsFilePath);
